@@ -1,14 +1,14 @@
 # WhatsApp PHP SDK
 
-SDK PHP ligero y eficiente para interactuar con la API de WhatsApp Web a través de wapi2.com.
+SDK PHP para interactuar con la API de WhatsApp Web mediante wapi2.com. Este SDK proporciona una interfaz simple y eficiente para integrar funcionalidades de WhatsApp en tus aplicaciones PHP.
 
-## Requisitos Previos
+## Prerequisitos
 
-1. PHP >= 7.0
-2. Extensiones PHP: curl, json
-3. Cuenta activa en [wapi2.com](https://wapi2.com)
-4. Token de autenticación de wapi2.com
-5. Al menos una sesión de WhatsApp creada en el panel de wapi2.com
+- PHP >= 7.0
+- Extensiones PHP: curl, json
+- Cuenta activa en [wapi2.com](https://wapi2.com)
+- Token de autenticación de wapi2.com
+- Una sesión de WhatsApp activa en wapi2.com
 
 ## Instalación
 
@@ -18,98 +18,189 @@ composer require wapi2/whatsapp-php-sdk
 
 ## Configuración Inicial
 
-### Creación de Sesiones
-Antes de utilizar el SDK, debe crear una sesión de WhatsApp en [wapi2.com](https://wapi2.com):
+Antes de usar el SDK:
 
-1. Registre una cuenta en wapi2.com
-2. Acceda a la sección "Sesiones"
-3. Cree una nueva sesión
-4. Escanee el código QR con WhatsApp Web desde su teléfono
-5. Guarde el ID de sesión proporcionado para su uso con el SDK
+1. Regístrate en [wapi2.com](https://wapi2.com)
+2. Accede a tu panel de control
+3. Obtén tu token de autenticación
+4. Crea una sesión en el apartado "Sesiones"
+5. Vincula tu número de WhatsApp mediante el código QR
 
 ## Uso Básico
 
 ```php
+<?php
+require 'vendor/autoload.php';
+
 use Wapi2\WhatsApp\WhatsAppClient;
 use Wapi2\WhatsApp\Exception\WhatsAppException;
 
+// Configurar cliente
+$token = 'tu-token-de-wapi2';
+$client = new WhatsAppClient($token);
+
 try {
-    // Inicializar el cliente
-    $client = new WhatsAppClient('tu-token-bearer');
-
-    // Obtener todas las sesiones disponibles
+    // Obtener sesiones disponibles
     $sessions = $client->getSessions();
-
-    // Verificar el estado de una sesión específica
-    $status = $client->checkAuth('ID-DE-SESION');
-
-    // Enviar un mensaje usando una sesión activa
-    $result = $client->sendMessage('34612345678', '¡Hola mundo!', 'ID-DE-SESION');
-
+    
+    if (!empty($sessions['message'])) {
+        $sessionId = $sessions['message'][0]['session_id'];
+        $phoneNumber = $sessions['message'][0]['phone_number'];
+        
+        // Verificar estado de la sesión
+        if ($sessions['message'][0]['status'] === 'ready') {
+            // Enviar un mensaje
+            $result = $client->sendMessage(
+                '34612345678',  // Número destinatario
+                '¡Hola desde WhatsApp!',
+                $sessionId
+            );
+            print_r($result);
+        }
+    }
 } catch (WhatsAppException $e) {
     echo "Error: " . $e->getMessage();
 }
 ```
 
-## Gestión de Sesiones
+## Funcionalidades Disponibles
 
-El SDK trabaja con sesiones previamente creadas en wapi2.com. Cada sesión representa una instancia de WhatsApp Web vinculada a un número de teléfono específico.
-
-### Métodos de Autenticación Disponibles
-
-- `checkAuth($sessionId)`: Verifica el estado de autenticación de una sesión específica
-- `getSessions()`: Obtiene la lista de todas las sesiones disponibles en su cuenta
-
-## Funcionalidades Principales
-
-### Mensajes
-- Envío de mensajes de texto
-- Envío de imágenes con descripción opcional
-- Envío de documentos PDF
-- Envío de ubicaciones
-
-### Grupos
-- Envío de mensajes a grupos
-- Envío de imágenes a grupos
-- Envío de documentos PDF a grupos
-- Envío de ubicaciones a grupos
-
-### Contactos
-- Obtención de lista de contactos
-- Verificación de números registrados
-- Obtención de información de contactos
-- Obtención de fotos de perfil
-
-## Manejo de Errores
-
-El SDK utiliza la clase `WhatsAppException` para manejar diferentes tipos de errores:
+### Gestión de Sesiones
 
 ```php
+// Obtener todas las sesiones
+$sessions = $client->getSessions();
+
+// Verificar estado de una sesión
+$status = $client->checkAuth($sessionId);
+```
+
+### Mensajería
+
+```php
+// Enviar mensaje de texto
+$client->sendMessage($phone, $message, $sessionId);
+
+// Enviar imagen
+$client->sendImage($phone, $imageUrl, $caption, $sessionId);
+
+// Enviar PDF
+$client->sendPDF($phone, $pdfUrl, $caption, $sessionId);
+
+// Enviar ubicación
+$client->sendLocation($phone, $latitude, $longitude, $description, $sessionId);
+```
+
+### Contactos
+
+```php
+// Obtener lista de contactos
+$contacts = $client->getContacts($sessionId);
+
+// Verificar si un número está en WhatsApp
+$isRegistered = $client->isRegisteredUser($phone, $sessionId);
+```
+
+## Ejemplo Completo de Implementación
+
+```php
+<?php
+require 'vendor/autoload.php';
+
+use Wapi2\WhatsApp\WhatsAppClient;
+use Wapi2\WhatsApp\Exception\WhatsAppException;
+
+$token = 'tu-token-de-wapi2';
+
 try {
-    $result = $client->sendMessage('34612345678', 'Mensaje', 'ID-DE-SESION');
+    // Inicializar el cliente
+    $client = new WhatsAppClient($token);
+
+    // Obtener sesiones disponibles
+    echo "Obteniendo sesiones...\n";
+    $sessions = $client->getSessions();
+
+    if (!empty($sessions['message'])) {
+        $sessionId = $sessions['message'][0]['session_id'];
+        
+        echo "\nSesión encontrada:";
+        echo "\nID: " . $sessionId;
+        echo "\nNúmero: " . $sessions['message'][0]['phone_number'];
+        echo "\nEstado: " . $sessions['message'][0]['status'] . "\n";
+
+        // Verificar autenticación
+        $auth = $client->checkAuth($sessionId);
+        
+        if ($sessions['message'][0]['status'] === 'ready') {
+            // Enviar mensaje
+            $result = $client->sendMessage(
+                '34612345678',
+                '¡Hola desde el SDK!',
+                $sessionId
+            );
+            
+            if ($result['status'] === 'success') {
+                echo "\nMensaje enviado exitosamente\n";
+            }
+            
+            // Enviar imagen
+            $imageResult = $client->sendImage(
+                '34612345678',
+                'https://ejemplo.com/imagen.jpg',
+                'Descripción de la imagen',
+                $sessionId
+            );
+        } else {
+            echo "\nLa sesión no está lista para enviar mensajes\n";
+        }
+    } else {
+        echo "\nNo se encontraron sesiones disponibles\n";
+    }
+
 } catch (WhatsAppException $e) {
-    if ($e->isAuthenticationError()) {
-        echo "Error de autenticación: " . $e->getMessage();
-    } elseif ($e->isSessionError()) {
-        echo "Error en la sesión de WhatsApp: " . $e->getMessage();
+    echo "Error: " . $e->getMessage() . "\n";
+    echo "Código: " . $e->getCode() . "\n";
+    if ($errorData = $e->getErrorData()) {
+        echo "Datos adicionales del error:\n";
+        print_r($errorData);
     }
 }
 ```
 
-## Consideraciones Importantes
+## Manejo de Errores
 
-- Las sesiones deben ser creadas y autenticadas previamente en wapi2.com
-- Cada sesión está vinculada a un número de teléfono específico
-- El token de autenticación debe mantenerse seguro
-- Se recomienda verificar el estado de la sesión antes de enviar mensajes
+El SDK utiliza la clase `WhatsAppException` para manejar errores:
 
-## Soporte
+```php
+try {
+    $result = $client->sendMessage($phone, $message, $sessionId);
+} catch (WhatsAppException $e) {
+    // Obtener mensaje de error
+    echo $e->getMessage();
+    
+    // Obtener código de error
+    echo $e->getCode();
+    
+    // Obtener datos adicionales del error
+    $errorData = $e->getErrorData();
+}
+```
 
-Para soporte técnico o reportar problemas:
-- Abra un issue en GitHub
-- Consulte la documentación en wapi2.com
-- Contacte al soporte de wapi2.com para problemas relacionados con las sesiones
+## Contribuir
+
+Las contribuciones son bienvenidas:
+
+1. Fork el repositorio
+2. Crea tu rama de feature (`git checkout -b feature/amazing-feature`)
+3. Commit tus cambios (`git commit -m 'Add some amazing feature'`)
+4. Push a la rama (`git push origin feature/amazing-feature`)
+5. Abre un Pull Request
 
 ## Licencia
 
-MIT
+Este proyecto está licenciado bajo la Licencia MIT - ver el archivo [LICENSE](LICENSE) para más detalles.
+
+## Soporte
+
+- Documentación de la API: [wapi2.com/docs](https://wapi2.com/docs)
+- Reportar issues: [GitHub Issues](https://github.com/wapi2/whatsapp-php-sdk/issues)
