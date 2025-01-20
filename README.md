@@ -202,5 +202,5 @@ Este proyecto está licenciado bajo la Licencia MIT - ver el archivo [LICENSE](L
 
 ## Soporte
 
-- Documentación de la API: [wapi2.com/docs](https://wapi2.com/docs)
+- Documentación de la API: [wapi2.com/api-docs](https://wapi2.com/api-docs)
 - Reportar issues: [GitHub Issues](https://github.com/wapi2/whatsapp-php-sdk/issues)
