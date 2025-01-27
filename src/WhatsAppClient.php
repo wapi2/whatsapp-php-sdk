@@ -65,17 +65,17 @@ class WhatsAppClient
     /**
      * Enviar mensaje de texto
      * 
-     * @param string $phone
+     * @param string $to Número de teléfono o ID de grupo
      * @param string $message
      * @param string $sessionId
      * @return array
      * @throws WhatsAppException
      */
-    public function sendMessage($phone, $message, $sessionId)
+    public function sendMessage($to, $message, $sessionId)
     {
         return $this->request(
             'POST',
-            "/chat/{$phone}/message",
+            "/chat/{$to}/message",
             ['message' => $message],
             ['session_id' => $sessionId]
         );
@@ -84,15 +84,17 @@ class WhatsAppClient
     /**
      * Enviar imagen
      * 
-     * @param string $phone
+     * @param string $to Número de teléfono o ID de grupo
      * @param string $image URL o Base64 de la imagen
      * @param string|null $caption
      * @param string $sessionId
      * @return array
      * @throws WhatsAppException
      */
-    public function sendImage($phone, $image, $caption, $sessionId)
+    public function sendImage($to, $image, $caption = null, $sessionId)
     {
+        $this->validateCaption($caption);
+        
         $data = ['image' => $image];
         if ($caption !== null) {
             $data['caption'] = $caption;
@@ -100,7 +102,7 @@ class WhatsAppClient
 
         return $this->request(
             'POST',
-            "/chat/{$phone}/image",
+            "/chat/{$to}/image",
             $data,
             ['session_id' => $sessionId]
         );
@@ -109,23 +111,129 @@ class WhatsAppClient
     /**
      * Enviar documento PDF
      * 
-     * @param string $phone
-     * @param string $pdf URL o Base64 del PDF
-     * @param string|null $caption
+     * @param string $to Número de teléfono o ID de grupo
+     * @param string $pdf URL o Base64 del PDF (máx 16MB)
+     * @param string $filename Nombre del archivo (máx 255 caracteres)
+     * @param string|null $caption Texto opcional (máx 1024 caracteres)
      * @param string $sessionId
      * @return array
      * @throws WhatsAppException
      */
-    public function sendPDF($phone, $pdf, $caption, $sessionId)
+    public function sendPDF($to, $pdf, $filename, $caption = null, $sessionId)
     {
-        $data = ['pdf' => $pdf];
+        $this->validateFilename($filename);
+        $this->validateCaption($caption);
+        
+        $data = [
+            'pdf' => $pdf,
+            'filename' => $filename
+        ];
         if ($caption !== null) {
             $data['caption'] = $caption;
         }
 
         return $this->request(
             'POST',
-            "/chat/{$phone}/pdf",
+            "/chat/{$to}/pdf",
+            $data,
+            ['session_id' => $sessionId]
+        );
+    }
+
+    /**
+     * Enviar video
+     * 
+     * @param string $to Número de teléfono o ID de grupo
+     * @param string $video URL o Base64 del video (mp4, 3gp, mov - máx 16MB)
+     * @param string|null $caption Texto opcional (máx 1024 caracteres)
+     * @param string $sessionId
+     * @return array
+     * @throws WhatsAppException
+     */
+    public function sendVideo($to, $video, $caption = null, $sessionId)
+    {
+        $this->validateCaption($caption);
+        
+        $data = ['video' => $video];
+        if ($caption !== null) {
+            $data['caption'] = $caption;
+        }
+
+        return $this->request(
+            'POST',
+            "/chat/{$to}/video",
+            $data,
+            ['session_id' => $sessionId]
+        );
+    }
+
+    /**
+     * Enviar documento de Office
+     * 
+     * @param string $to Número de teléfono o ID de grupo
+     * @param string $document URL o Base64 del documento (doc, docx, xls, xlsx, ppt, pptx - máx 16MB)
+     * @param string $filename Nombre del archivo (máx 255 caracteres)
+     * @param string|null $caption Texto opcional (máx 1024 caracteres)
+     * @param string $sessionId
+     * @return array
+     * @throws WhatsAppException
+     */
+    public function sendOfficeDocument($to, $document, $filename, $caption = null, $sessionId)
+    {
+        $this->validateFilename($filename);
+        $this->validateCaption($caption);
+        
+        // Validar formato de archivo Office
+        $this->validateFileFormat($filename, ['doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx']);
+        
+        // Si es base64, validar tamaño
+        if (preg_match('/^data:.*;base64,/', $document) || ctype_alnum($document)) {
+            $this->validateFileSize($document);
+        }
+        
+        $data = [
+            'document' => $document,
+            'filename' => $filename
+        ];
+        if ($caption !== null) {
+            $data['caption'] = $caption;
+        }
+
+        return $this->request(
+            'POST',
+            "/chat/{$to}/office",
+            $data,
+            ['session_id' => $sessionId]
+        );
+    }
+
+    /**
+     * Enviar archivo ZIP
+     * 
+     * @param string $to Número de teléfono o ID de grupo
+     * @param string $document URL o Base64 del archivo ZIP (máx 16MB)
+     * @param string $filename Nombre del archivo (máx 255 caracteres)
+     * @param string|null $caption Texto opcional (máx 1024 caracteres)
+     * @param string $sessionId
+     * @return array
+     * @throws WhatsAppException
+     */
+    public function sendZipFile($to, $document, $filename, $caption = null, $sessionId)
+    {
+        $this->validateFilename($filename);
+        $this->validateCaption($caption);
+        
+        $data = [
+            'document' => $document,
+            'filename' => $filename
+        ];
+        if ($caption !== null) {
+            $data['caption'] = $caption;
+        }
+
+        return $this->request(
+            'POST',
+            "/chat/{$to}/zip",
             $data,
             ['session_id' => $sessionId]
         );
@@ -134,7 +242,7 @@ class WhatsAppClient
     /**
      * Enviar ubicación
      * 
-     * @param string $phone
+     * @param string $to Número de teléfono o ID de grupo
      * @param float $latitude
      * @param float $longitude
      * @param string|null $description
@@ -142,7 +250,7 @@ class WhatsAppClient
      * @return array
      * @throws WhatsAppException
      */
-    public function sendLocation($phone, $latitude, $longitude, $description, $sessionId)
+    public function sendLocation($to, $latitude, $longitude, $description = null, $sessionId)
     {
         $data = [
             'latitude' => $latitude,
@@ -154,7 +262,7 @@ class WhatsAppClient
 
         return $this->request(
             'POST',
-            "/chat/{$phone}/location",
+            "/chat/{$to}/location",
             $data,
             ['session_id' => $sessionId]
         );
@@ -173,6 +281,18 @@ class WhatsAppClient
     }
 
     /**
+     * Obtener todos los grupos
+     * 
+     * @param string $sessionId
+     * @return array
+     * @throws WhatsAppException
+     */
+    public function getGroups($sessionId)
+    {
+        return $this->request('GET', '/contact/getgroups', [], ['session_id' => $sessionId]);
+    }
+
+    /**
      * Verificar si un número está registrado en WhatsApp
      * 
      * @param string $phone
@@ -188,6 +308,86 @@ class WhatsAppClient
             [],
             ['session_id' => $sessionId]
         );
+    }
+
+    /**
+     * Validar longitud del nombre de archivo
+     * 
+     * @param string $filename
+     * @throws WhatsAppException
+     */
+    private function validateFilename($filename)
+    {
+        if (strlen($filename) > 255) {
+            throw WhatsAppException::filenameLengthError();
+        }
+    }
+
+    /**
+     * Validar longitud del caption
+     * 
+     * @param string|null $caption
+     * @throws WhatsAppException
+     */
+    private function validateCaption($caption)
+    {
+        if ($caption !== null && strlen($caption) > 1024) {
+            throw WhatsAppException::captionLengthError();
+        }
+    }
+
+    /**
+     * Validar tamaño del archivo
+     * 
+     * @param string $fileContent
+     * @throws WhatsAppException
+     */
+    /**
+     * Validar tamaño del archivo
+     * 
+     * @param string $fileContent
+     * @throws WhatsAppException
+     */
+    private function validateFileSize($fileContent)
+    {
+        // Extraer el contenido base64 si está en formato data URI
+        if (preg_match('/^data:[^;]+;base64,(.+)$/', $fileContent, $matches)) {
+            $fileContent = $matches[1];
+        }
+
+        // Decodificar el contenido base64
+        $decodedContent = base64_decode($fileContent);
+        if ($decodedContent === false) {
+            throw new WhatsAppException(
+                'Contenido base64 inválido',
+                WhatsAppException::ERROR_INVALID_FILE_FORMAT
+            );
+        }
+
+        if (strlen($decodedContent) > 16 * 1024 * 1024) { // 16MB
+            throw new WhatsAppException(
+                'El archivo excede el tamaño máximo permitido de 16MB',
+                WhatsAppException::ERROR_FILE_SIZE
+            );
+        }
+    }
+
+    /**
+     * Validar formato de archivo
+     * 
+     * @param string $filename
+     * @param array $allowedExtensions
+     * @throws WhatsAppException
+     */
+    private function validateFileFormat($filename, array $allowedExtensions)
+    {
+        $extension = strtolower(pathinfo($filename, PATHINFO_EXTENSION));
+        if (!in_array($extension, $allowedExtensions)) {
+            throw new WhatsAppException(
+                sprintf('El formato de archivo %s no está soportado', $extension),
+                WhatsAppException::ERROR_INVALID_FILE_FORMAT
+            );
+        }
     }
 
     /**
@@ -237,7 +437,8 @@ class WhatsAppClient
         if ($httpCode >= 400) {
             throw new WhatsAppException(
                 isset($decoded['message']) ? $decoded['message'] : 'Error en la petición',
-                $httpCode
+                $httpCode,
+                $decoded
             );
         }
 

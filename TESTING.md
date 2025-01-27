@@ -64,18 +64,31 @@ tests/
 
 2. **Mensajería**
    - testSendMessageSuccess
-   - testSendMessageSessionError
    - testSendImageSuccess
+   - testSendVideoSuccess
    - testSendPDFSuccess
+   - testSendOfficeDocumentSuccess
+   - testSendZipFileSuccess
    - testSendLocationSuccess
 
-3. **Manejo de Errores**
+3. **Grupos y Contactos**
+   - testGetContactsSuccess
+   - testGetGroupsSuccess
+   - testIsRegisteredUserSuccess
+
+4. **Validaciones**
+   - testFilenameExceedsMaxLength
+   - testCaptionExceedsMaxLength
+
+5. **Manejo de Errores**
    - testConnectionError
    - testInvalidJsonResponse
+   - testUnauthorizedError
+   - testSessionNotFoundError
 
 ## Mocking
 
-Los tests utilizan una clase anónima que extiende de WhatsAppClient para simular las respuestas de la API. Esto se hace sobreescribiendo los métodos de cURL:
+Los tests utilizan una clase anónima que extiende de WhatsAppClient para simular las respuestas de la API:
 
 ```php
 $this->client = new class($testToken) extends WhatsAppClient {
@@ -91,51 +104,107 @@ $this->client = new class($testToken) extends WhatsAppClient {
 };
 ```
 
-## Añadir Nuevos Tests
+## Ejemplos de Tests
 
-Al añadir nuevos tests, sigue estas pautas:
-
-1. **Nombrado**: Use nombres descriptivos que indiquen qué se está probando
-2. **Organización**: Agrupe tests relacionados juntos
-3. **Documentación**: Añada comentarios PHPDoc a cada test
-4. **Assertions**: Use assertions específicos y descriptivos
-
-Ejemplo:
+### Test de Envío de Video
 ```php
-/**
- * Test envío de mensaje exitoso
- */
-public function testSendMessageSuccess()
+public function testSendVideoSuccess()
 {
     $expectedResponse = [
         'status' => 'success',
-        'message' => 'Message sent successfully'
+        'message' => 'Video sent successfully'
     ];
 
     $this->mockCurlRequest($expectedResponse);
-    $response = $this->client->sendMessage(...);
+    $response = $this->client->sendVideo(
+        '34612345678',
+        'https://example.com/video.mp4',
+        'Test caption',
+        'test-session-id'
+    );
+
     $this->assertEquals('success', $response['status']);
 }
 ```
 
-## Depuración
+### Test de Excepciones Específicas
+```php
+class WhatsAppClientTest extends TestCase
+{
+    public function testFilenameExceedsMaxLength()
+    {
+        $this->expectException(WhatsAppException::class);
+        $this->expectExceptionCode(WhatsAppException::ERROR_FILENAME_LENGTH);
 
-Para depurar tests específicos:
+        $longFilename = str_repeat('a', 256) . '.pdf';
+        $this->client->sendPDF(
+            '34612345678',
+            'https://example.com/doc.pdf',
+            $longFilename,
+            'Test caption',
+            'test-session-id'
+        );
+    }
 
-```bash
-# Ejecutar con más detalle
-./vendor/bin/phpunit --debug
+    public function testInvalidFileFormat()
+    {
+        $this->expectException(WhatsAppException::class);
+        $this->expectExceptionCode(WhatsAppException::ERROR_INVALID_FILE_FORMAT);
 
-# Ver stack trace completo
-./vendor/bin/phpunit --verbose
+        $this->client->sendOfficeDocument(
+            '34612345678',
+            'https://example.com/doc.txt',
+            'document.txt',
+            'Test caption',
+            'test-session-id'
+        );
+    }
+
+    public function testGroupPermissionError()
+    {
+        $this->expectException(WhatsAppException::class);
+        $this->expectExceptionCode(WhatsAppException::ERROR_GROUP_PERMISSION);
+        
+        // Simular error de permisos
+        $this->mockCurlRequest(
+            ['error' => 'No tienes permisos para enviar mensajes en este grupo'],
+            403
+        );
+
+        $this->client->sendMessage(
+            'group-id',
+            'Test message',
+            'test-session-id'
+        );
+    }
+}
 ```
+
+## Consideraciones para Nuevos Tests
+
+1. **Casos de Prueba Comunes**
+   - Éxito de la operación
+   - Validación de datos de entrada
+   - Manejo de errores
+   - Límites y restricciones
+
+2. **Datos de Prueba**
+   - Usar formatos válidos de números de teléfono
+   - Respetar límites de tamaño y longitud
+   - Incluir caracteres especiales cuando sea relevante
+
+3. **Validaciones Específicas**
+   - Tamaño máximo de archivos (16MB)
+   - Longitud de nombres de archivo (255 caracteres)
+   - Longitud de captions (1024 caracteres)
+   - Formatos de archivo soportados
 
 ## Mantenimiento
 
-- Ejecute los tests antes de cada commit
-- Mantenga la cobertura de código por encima del 80%
-- Actualice la documentación cuando añada nuevos tests
-- Revise y actualice los mocks según los cambios en la API
+- Ejecutar los tests antes de cada commit
+- Mantener la cobertura de código por encima del 80%
+- Actualizar la documentación cuando se añadan nuevos tests
+- Revisar y actualizar los mocks según los cambios en la API
 
 ## CI/CD
 

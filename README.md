@@ -43,15 +43,14 @@ try {
     // Obtener sesiones disponibles
     $sessions = $client->getSessions();
     
-    if (!empty($sessions['message'])) {
-        $sessionId = $sessions['message'][0]['session_id'];
-        $phoneNumber = $sessions['message'][0]['phone_number'];
+    if (!empty($sessions['data'])) {
+        $sessionId = $sessions['data'][0]['session_id'];
         
         // Verificar estado de la sesión
-        if ($sessions['message'][0]['status'] === 'ready') {
+        if ($sessions['data'][0]['status'] === 'ready') {
             // Enviar un mensaje
             $result = $client->sendMessage(
-                '34612345678',  // Número destinatario
+                '34612345678',  // Número destinatario o ID de grupo
                 '¡Hola desde WhatsApp!',
                 $sessionId
             );
@@ -62,6 +61,14 @@ try {
     echo "Error: " . $e->getMessage();
 }
 ```
+
+## Límites y Restricciones
+
+- Tamaño máximo de archivos: 16MB
+- Longitud máxima del nombre de archivo: 255 caracteres
+- Longitud máxima de caption: 1024 caracteres
+- Formatos de video soportados: mp4, 3gp, mov
+- Formatos de documentos Office soportados: doc, docx, xls, xlsx, ppt, pptx
 
 ## Funcionalidades Disponibles
 
@@ -79,23 +86,35 @@ $status = $client->checkAuth($sessionId);
 
 ```php
 // Enviar mensaje de texto
-$client->sendMessage($phone, $message, $sessionId);
+$client->sendMessage($to, $message, $sessionId);
 
 // Enviar imagen
-$client->sendImage($phone, $imageUrl, $caption, $sessionId);
+$client->sendImage($to, $imageUrl, $caption, $sessionId);
+
+// Enviar video
+$client->sendVideo($to, $videoUrl, $caption, $sessionId);
 
 // Enviar PDF
-$client->sendPDF($phone, $pdfUrl, $caption, $sessionId);
+$client->sendPDF($to, $pdfUrl, $filename, $caption, $sessionId);
+
+// Enviar documento de Office
+$client->sendOfficeDocument($to, $documentUrl, $filename, $caption, $sessionId);
+
+// Enviar archivo ZIP
+$client->sendZipFile($to, $zipUrl, $filename, $caption, $sessionId);
 
 // Enviar ubicación
-$client->sendLocation($phone, $latitude, $longitude, $description, $sessionId);
+$client->sendLocation($to, $latitude, $longitude, $description, $sessionId);
 ```
 
-### Contactos
+### Contactos y Grupos
 
 ```php
 // Obtener lista de contactos
 $contacts = $client->getContacts($sessionId);
+
+// Obtener lista de grupos
+$groups = $client->getGroups($sessionId);
 
 // Verificar si un número está en WhatsApp
 $isRegistered = $client->isRegisteredUser($phone, $sessionId);
@@ -117,21 +136,15 @@ try {
     $client = new WhatsAppClient($token);
 
     // Obtener sesiones disponibles
-    echo "Obteniendo sesiones...\n";
     $sessions = $client->getSessions();
 
-    if (!empty($sessions['message'])) {
-        $sessionId = $sessions['message'][0]['session_id'];
+    if (!empty($sessions['data'])) {
+        $sessionId = $sessions['data'][0]['session_id'];
         
-        echo "\nSesión encontrada:";
-        echo "\nID: " . $sessionId;
-        echo "\nNúmero: " . $sessions['message'][0]['phone_number'];
-        echo "\nEstado: " . $sessions['message'][0]['status'] . "\n";
-
         // Verificar autenticación
         $auth = $client->checkAuth($sessionId);
         
-        if ($sessions['message'][0]['status'] === 'ready') {
+        if ($auth['authenticated']) {
             // Enviar mensaje
             $result = $client->sendMessage(
                 '34612345678',
@@ -143,15 +156,28 @@ try {
                 echo "\nMensaje enviado exitosamente\n";
             }
             
-            // Enviar imagen
-            $imageResult = $client->sendImage(
+            // Enviar documento
+            $documentResult = $client->sendOfficeDocument(
                 '34612345678',
-                'https://ejemplo.com/imagen.jpg',
-                'Descripción de la imagen',
+                'https://ejemplo.com/documento.docx',
+                'informe.docx',
+                'Informe mensual',
                 $sessionId
             );
+
+            // Obtener grupos
+            $groups = $client->getGroups($sessionId);
+            if (!empty($groups['groups'])) {
+                // Enviar mensaje a un grupo
+                $groupId = $groups['groups'][0]['id'];
+                $client->sendMessage(
+                    $groupId,
+                    'Mensaje para el grupo',
+                    $sessionId
+                );
+            }
         } else {
-            echo "\nLa sesión no está lista para enviar mensajes\n";
+            echo "\nLa sesión no está autenticada\n";
         }
     } else {
         echo "\nNo se encontraron sesiones disponibles\n";
@@ -169,22 +195,70 @@ try {
 
 ## Manejo de Errores
 
-El SDK utiliza la clase `WhatsAppException` para manejar errores:
+El SDK utiliza la clase `WhatsAppException` para manejar diferentes tipos de errores:
 
 ```php
 try {
-    $result = $client->sendMessage($phone, $message, $sessionId);
+    $result = $client->sendMessage($to, $message, $sessionId);
 } catch (WhatsAppException $e) {
-    // Obtener mensaje de error
-    echo $e->getMessage();
+    // Verificar tipo específico de error
+    if ($e->isValidationError()) {
+        // Manejar errores de validación (tamaño archivo, longitud nombre, etc)
+        switch ($e->getCode()) {
+            case WhatsAppException::ERROR_FILE_SIZE:
+                echo "El archivo excede el límite de 16MB";
+                break;
+            case WhatsAppException::ERROR_FILENAME_LENGTH:
+                echo "Nombre de archivo demasiado largo";
+                break;
+            case WhatsAppException::ERROR_CAPTION_LENGTH:
+                echo "Caption demasiado largo";
+                break;
+        }
+    } elseif ($e->isAuthenticationError()) {
+        // Manejar errores de autenticación y permisos
+        if ($e->isErrorType(WhatsAppException::ERROR_GROUP_PERMISSION)) {
+            echo "Sin permisos en el grupo";
+        }
+    }
     
-    // Obtener código de error
-    echo $e->getCode();
-    
-    // Obtener datos adicionales del error
-    $errorData = $e->getErrorData();
+    // También puedes obtener:
+    echo $e->getMessage();      // Mensaje de error
+    echo $e->getCode();        // Código de error
+    $errorData = $e->getErrorData(); // Datos adicionales
 }
 ```
+
+### Tipos de Errores Específicos
+
+1. **Errores de Validación** (`isValidationError()`):
+   - `ERROR_FILE_SIZE`: Archivo excede 16MB
+   - `ERROR_FILENAME_LENGTH`: Nombre excede 255 caracteres
+   - `ERROR_CAPTION_LENGTH`: Caption excede 1024 caracteres
+   - `ERROR_INVALID_FILE_FORMAT`: Formato de archivo no soportado
+
+2. **Errores de Autenticación** (`isAuthenticationError()`):
+   - `ERROR_GROUP_PERMISSION`: Sin permisos en grupo
+   - `ERROR_SESSION_INVALID`: Sesión inválida o expirada
+   - `ERROR_AUTHENTICATION`: Error de autenticación general
+```
+
+## Buenas Prácticas
+
+1. **Manejo de Archivos**
+   - Verifica el tamaño del archivo antes de enviar (máx 16MB)
+   - Usa nombres de archivo descriptivos y cortos (máx 255 caracteres)
+   - Incluye la extensión correcta según el tipo de archivo
+
+2. **Mensajes y Captions**
+   - Mantén los captions concisos (máx 1024 caracteres)
+   - Usa formato de números internacional para teléfonos
+   - Verifica que los grupos permitan mensajes antes de enviar
+
+3. **Gestión de Sesiones**
+   - Verifica el estado de autenticación antes de enviar mensajes
+   - Maneja adecuadamente las desconexiones
+   - Implementa reintentos para errores temporales
 
 ## Contribuir
 
@@ -202,5 +276,5 @@ Este proyecto está licenciado bajo la Licencia MIT - ver el archivo [LICENSE](L
 
 ## Soporte
 
-- Documentación de la API: [wapi2.com/api-docs](https://wapi2.com/api-docs)
+- Documentación de la API: [wapi2.com/docs](https://wapi2.com/docs)
 - Reportar issues: [GitHub Issues](https://github.com/wapi2/whatsapp-php-sdk/issues)

@@ -2,6 +2,7 @@
     "name": "wapi2/whatsapp-php-sdk",
     "description": "SDK PHP para la API de WhatsApp Web",
     "type": "library",
+    "version": "1.1.0",
     "license": "MIT",
     "autoload": {
         "psr-4": {
@@ -23,5 +24,16 @@
     },
     "scripts": {
         "test": "phpunit"
+    },
+    "keywords": [
+        "whatsapp",
+        "api",
+        "sdk",
+        "php",
+        "wapi2"
+    ],
+    "homepage": "https://github.com/wapi2/whatsapp-php-sdk",
+    "support": {
+        "issues": "https://github.com/wapi2/whatsapp-php-sdk/issues"
     }
 }
